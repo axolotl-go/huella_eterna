@@ -3,10 +3,14 @@ package main
 import (
 	"log"
 
+	servicetype "github.com/axolotl-go/eternal_paw/internal/ServiceType"
 	"github.com/axolotl-go/eternal_paw/internal/config"
 	"github.com/axolotl-go/eternal_paw/internal/db"
 	formregister "github.com/axolotl-go/eternal_paw/internal/form_register"
 	"github.com/axolotl-go/eternal_paw/internal/http"
+	"github.com/axolotl-go/eternal_paw/internal/pets"
+	serviceorders "github.com/axolotl-go/eternal_paw/internal/service_orders"
+	"github.com/axolotl-go/eternal_paw/internal/users"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 )
@@ -29,11 +33,17 @@ func main() {
 	// 	log.Fatal(err)
 	// }
 
+	// db.DB.Migrator().DropTable(
+	// 	&pets.Pet{},
+	// 	&serviceorders.Order{},
+
+	// )
+
 	db.DB.AutoMigrate(
-		// &users.User{},
-		// &pets.Pet{},
-		// &serviceorders.Order{},
-		// &servicetype.ServiceType{},
+		&users.User{},
+		&pets.Pet{},
+		&serviceorders.Order{},
+		&servicetype.ServiceType{},
 		&formregister.Appointment{},
 	)
 
@@ -46,6 +56,6 @@ func main() {
 	// }))
 
 	http.SetupRouter(app)
-	log.Fatal(app.Listen("0.0.0.0:8080"))
+	log.Fatal(app.Listen(serverxport))
 
 }

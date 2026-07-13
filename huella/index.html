@@ -1413,8 +1413,8 @@
             <label for="nombre">Tu nombre</label>
             <input
               type="text"
-              id="nombre"
-              name="nombre"
+              id="name"
+              name="name"
               placeholder="¿Cómo te llamas?"
               required
             />
@@ -1423,15 +1423,25 @@
             <label for="telefono">Teléfono o WhatsApp</label>
             <input
               type="tel"
-              id="telefono"
-              name="telefono"
+              id="phone"
+              name="phone"
               placeholder="871 000 0000"
               required
             />
           </div>
           <div class="form-group">
-            <label for="servicio">Servicio de interés</label>
-            <select id="servicio" name="servicio" required>
+            <label for="telefono">Email</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              placeholder="hello@huellaeterna.com"
+              required
+            />
+          </div>
+          <div class="form-group">
+            <label for="service">Servicio de interés</label>
+            <select id="service" name="service" required>
               <option value="" disabled selected>Selecciona un servicio</option>
               <option value="siembra">
                 Siembra — mi mascota vive en una planta
@@ -1441,8 +1451,8 @@
             </select>
           </div>
           <div class="form-group">
-            <label for="especie">Especie</label>
-            <select id="especie" name="especie">
+            <label for="species">Especie</label>
+            <select id="species" name="species">
               <option value="" disabled selected>Perro, gato, otro...</option>
               <option value="perro">Perro</option>
               <option value="gato">Gato</option>
@@ -1451,25 +1461,20 @@
             </select>
           </div>
           <div class="form-group">
-            <label for="nombre_mascota"
-              >Nombre de tu mascota
-              <span style="opacity: 0.4; font-size: 0.65rem"
-                >(opcional)</span
-              ></label
-            >
+            <label for="pet_name">Nombre de tu mascota </label>
             <input
               type="text"
-              id="nombre_mascota"
-              name="nombre_mascota"
+              id="pet_name"
+              name="pet_name"
               placeholder="¿Nombre de la mascota?"
             />
           </div>
           <div class="form-group">
-            <label for="peso">Peso aproximado (kg)</label>
+            <label for="approx_weight_kg">Peso aproximado (kg)</label>
             <input
               type="number"
-              id="peso"
-              name="peso"
+              id="approx_weight_kg"
+              name="approx_weight_kg"
               placeholder="ej. 8"
               min="0"
               max="200"
@@ -1786,34 +1791,51 @@
       }
 
       // Form mock submit
+
       document
         .getElementById("quoteForm")
         .addEventListener("submit", function (e) {
           e.preventDefault();
 
           const data = {
-            nombre: document.getElementById("nombre").value,
-            telefono: document.getElementById("telefono").value,
-            servicio: document.getElementById("servicio").value,
-            especie: document.getElementById("especie").value,
-            nombre_mascota: document.getElementById("nombre_mascota").value,
-            peso: document.getElementById("peso").value,
+            name: document.getElementById("name").value.trim(),
+            phone: document.getElementById("phone").value.trim(),
+            email: document.getElementById("email").value.trim(),
+            service: document.getElementById("service").value,
+            species: document.getElementById("species").value,
+            pet_name: document.getElementById("pet_name").value.trim(),
+            approx_weight_kg: parseFloat(
+              document.getElementById("approx_weight_kg").value,
+            ),
           };
 
+          // Campos obligatorios
           if (
-            !data.nombre ||
-            !data.especie ||
-            !data.servicio ||
-            !data.telefono ||
-            !data.peso ||
-            !data.nombre_mascota
+            !data.name ||
+            !data.phone ||
+            !data.service ||
+            !data.species ||
+            !data.pet_name
           ) {
             alert("Por favor completa los campos obligatorios.");
             return;
           }
 
-          // Aquí irá el fetch al endpoint del compañero
-          // fetch('/api/quotes', { method: 'POST', body: JSON.stringify({...}) })
+          // Peso
+          if (
+            Number.isNaN(data.approx_weight_kg) ||
+            data.approx_weight_kg <= 0 ||
+            data.approx_weight_kg > 200
+          ) {
+            alert("El peso debe estar entre 0 y 200 kg.");
+            return;
+          }
+
+          // Teléfono
+          if (data.phone.length < 8 || data.phone.length > 20) {
+            alert("El teléfono debe tener entre 8 y 20 caracteres.");
+            return;
+          }
 
           fetch("https://api.funeraria-huellaeterna.com/api/form_register", {
             method: "POST",
@@ -1822,7 +1844,17 @@
             },
             body: JSON.stringify(data),
           })
-            .then((res) => res.json())
+            .then(async (res) => {
+              const response = await res.json();
+
+              if (!res.ok) {
+                throw new Error(
+                  response.message || "Error al enviar la solicitud.",
+                );
+              }
+
+              return response;
+            })
             .then((response) => {
               console.log(response);
 
@@ -1830,14 +1862,9 @@
               document.getElementById("formSuccess").style.display = "block";
             })
             .catch((err) => {
-              // console.error(err);
-              alert("Ocurrió un error al enviar la solicitud.");
+              console.error(err);
+              alert(err.message || "Ocurrió un error al enviar la solicitud.");
             });
-
-          // console.log("Formulario enviado:", data);
-
-          this.style.display = "none";
-          document.getElementById("formSuccess").style.display = "block";
         });
     </script>
   </body>

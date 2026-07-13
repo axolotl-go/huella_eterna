@@ -79,9 +79,7 @@ func Views(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(
-		fiber.Map{
-			"Orders": serviceTypes,
-		},
+		serviceTypes,
 	)
 }
 

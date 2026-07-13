@@ -143,7 +143,7 @@ func Logout(c *fiber.Ctx) error {
 	})
 }
 
-func Me(c *fiber.Ctx) error {
+func JWT_Verify(c *fiber.Ctx) error {
 	tokenString := c.Cookies("token")
 	if tokenString == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
@@ -166,15 +166,18 @@ func Me(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"username": user.Name,
-		"email":    user.Email,
-		"address":  user.Address,
-		"phone":    user.Phone,
-		"role":     user.Role,
+		"authenticated": true,
+		"role":          user.Role,
+		"name":          user.Name,
+		"email":         user.Email,
+		"phone":         user.Phone,
+		"address":       user.Address,
 	})
 }
 
 func Verify(c *fiber.Ctx) error {
+	var user User
+
 	tokenString := c.Cookies("token")
 	if tokenString == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
@@ -182,14 +185,26 @@ func Verify(c *fiber.Ctx) error {
 		})
 	}
 
-	_, err := auth.ParserJwt(tokenString)
+	claims, err := auth.ParserJwt(tokenString)
 	if err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Invalid token",
 		})
 	}
 
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"valid": true,
+	if err := db.DB.Where("id = ?", claims["id"]).First(&user).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "User not found",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"authenticated": true,
+		"user": fiber.Map{
+			"id":       user.ID,
+			"username": user.Name,
+			"email":    user.Email,
+			"role":     user.Role,
+		},
 	})
 }

@@ -12,37 +12,67 @@ import (
 func SetupRouter(app *fiber.App) {
 
 	app.Get("/", func(c *fiber.Ctx) error {
-
-		return c.SendString("Hello, little treea!")
+		return c.SendString("Hello, little tree!")
 	})
 
-	api := app.Group("/api")
+	// ===========================
+	// Public routes
+	// ===========================
 
-	// Landing FormContact
-	api.Post("/form_register", formregister.Create)
-	api.Get("/form_register", middleware.Role, formregister.Views)
-	api.Get("/verify", users.Verify)
+	public := app.Group("/api")
+
+	// Auth
+	public.Post("/login", users.Login)
+	public.Post("/user", users.Create)
+	public.Get("/verify", users.Verify)
+
+	// Landing
+	public.Post("/form_register", formregister.Create)
+
+	// ===========================
+	// Private routes
+	// ===========================
+
+	private := app.Group("/api")
+	private.Use(middleware.CurrentUser)
 
 	// User
-	api.Post("/login", users.Login)
-	api.Get("/jwtVerify", users.JWT_Verify)
-	api.Post("/user", users.Create)
-	api.Post("/logout", users.Logout)
-
-	// Pets
-	// api.Post("/pets", pets.Create)
-	// api.Get("/pet/:uuid", pets.Get)
+	private.Get("/me", users.Me)
+	private.Put("/user", users.Edit)
+	private.Delete("/user", users.Delete)
+	private.Post("/logout", users.Logout)
 
 	// Orders
-	api.Get("/orders", middleware.Role, serviceorders.Views)
-	api.Get("/orders/:folio", serviceorders.View)
-	api.Post("/orders", serviceorders.Create)
+	private.Post("/order", serviceorders.Create)
+	private.Get("/order/:folio", serviceorders.View)
+	private.Get("/me/orders", serviceorders.ViewMyOrders)
+	private.Put("/order/:id", serviceorders.Edit)
+	private.Delete("/order/:id", serviceorders.Delete)
 
-	// // SeriveType
-	// api.Post("/service_type", servicetype.Create)
-	// api.Delete("/service_type/:id", servicetype.Delete)
-	api.Get("/service_type", servicetype.Views)
-	api.Get("/service_type/:id", servicetype.View)
+	// Services
+	private.Get("/services", servicetype.Views)
 
-	// Certificacion
+	// ===========================
+	// Admin routes
+	// ===========================
+
+	admin := private.Group("/")
+	admin.Use(middleware.Role)
+
+	// Users
+	admin.Get("/users", users.Views)
+	admin.Delete("/users/:id", users.DeleteByAdmin)
+	admin.Get("/users/:id/orders", serviceorders.ViewMyOrders)
+
+	// Contact forms
+	admin.Get("/form_register", formregister.Views)
+
+	// Orders
+	admin.Get("/orders", serviceorders.Views)
+
+	// Services
+	admin.Post("/service", servicetype.Create)
+	admin.Put("/service/:id", servicetype.Edit)
+	admin.Delete("/service/:id", servicetype.Delete)
+	admin.Get("/service/:id", servicetype.View)
 }

@@ -13,6 +13,12 @@ type User struct {
 	Role     string `gorm:"not null;default:client" json:"role"`
 }
 
+type UpdateUser struct {
+	Name    string `json:"name"`
+	Phone   string `json:"phone"`
+	Address string `json:"address"`
+}
+
 type LoginInput struct {
 	Email    string `json:"email" binding:"required"`
 	Password string `json:"password" binding:"required"`

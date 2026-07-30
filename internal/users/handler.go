@@ -3,6 +3,7 @@ package users
 import (
 	"errors"
 	"net/mail"
+	"strings"
 
 	"github.com/axolotl-go/eternal_paw/internal/auth"
 	"github.com/axolotl-go/eternal_paw/internal/db"
@@ -59,6 +60,7 @@ func Create(c *fiber.Ctx) error {
 		})
 	}
 
+	user.Email = strings.ToLower(user.Email)
 	user.Password = hashed
 
 	if err := CreateUser(&user); err != nil {
@@ -80,6 +82,52 @@ func Create(c *fiber.Ctx) error {
 	})
 }
 
+func Edit(c *fiber.Ctx) error {
+	var (
+		update UpdateUser
+		user   = c.Locals("user").(*User)
+	)
+
+	if err := c.BodyParser(&update); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid body",
+		})
+	}
+
+	if update.Name != "" {
+		user.Name = update.Name
+	}
+
+	if update.Phone != "" {
+		user.Phone = update.Phone
+	}
+
+	if update.Address != "" {
+		user.Address = update.Address
+	}
+
+	if err := db.DB.Save(user).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON("Succefull")
+}
+
+func Delete(c *fiber.Ctx) error {
+	var user = c.Locals("user").(*User)
+
+	if err := db.DB.Delete(user).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+// All routes, login...
 func Login(c *fiber.Ctx) error {
 	var input LoginInput
 
@@ -88,6 +136,8 @@ func Login(c *fiber.Ctx) error {
 			"error": "Invalid body",
 		})
 	}
+
+	input.Email = strings.ToLower(input.Email)
 
 	user, err := AuthenticateUser(input.Email, input.Password)
 	if err != nil {
@@ -143,27 +193,8 @@ func Logout(c *fiber.Ctx) error {
 	})
 }
 
-func JWT_Verify(c *fiber.Ctx) error {
-	tokenString := c.Cookies("token")
-	if tokenString == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "No token provided",
-		})
-	}
-
-	claims, err := auth.ParserJwt(tokenString)
-	if err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Invalid token",
-		})
-	}
-
-	var user User
-	if err := db.DB.Where("id = ?", claims["id"]).First(&user).Error; err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"error": "User not found",
-		})
-	}
+func Me(c *fiber.Ctx) error {
+	user := c.Locals("user").(*User)
 
 	return c.JSON(fiber.Map{
 		"authenticated": true,
@@ -207,4 +238,47 @@ func Verify(c *fiber.Ctx) error {
 			"role":     user.Role,
 		},
 	})
+}
+
+func Views(c *fiber.Ctx) error {
+	var users []User
+
+	if err := db.DB.Find(&users).Error; err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Bad Request",
+		})
+	}
+
+	for i := range users {
+		users[i].Password = ""
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"user": users,
+	})
+}
+
+func DeleteByAdmin(c *fiber.Ctx) error {
+	id, err := c.ParamsInt("id")
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid user id",
+		})
+	}
+
+	result := db.DB.Unscoped().Delete(&User{}, id)
+
+	if result.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": result.Error.Error(),
+		})
+	}
+
+	if result.RowsAffected == 0 {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "User not found",
+		})
+	}
+
+	return c.SendStatus(fiber.StatusNoContent)
 }

@@ -30,9 +30,10 @@ type OrderPreview struct {
 
 	PetName string `json:"pet_name"`
 
-	ServiceName string ` json:"service_name"`
-	Folio       string `json:"folio"`
-	Status      string `json:"status"`
+	ServiceName string  ` json:"service_name"`
+	Folio       string  `json:"folio"`
+	Status      string  `json:"status"`
+	Price       float32 `json:"price"`
 
 	Date *time.Time `json:"date"`
 }
@@ -43,11 +44,15 @@ type OrderResponse struct {
 	Phone    string `json:"phone"`
 	Address  string `json:"address"`
 
-	PetName   string     `json:"pet_name"`
-	Species   string     `json:"species"`
-	Breed     string     `json:"breed"`
-	Weight    float64    `json:"weight"`
-	DeathDate *time.Time `json:"death_date"`
+	PetName     string     `json:"pet_name"`
+	Species     string     `json:"species"`
+	Breed       string     `json:"breed"`
+	Weight      float64    `json:"weight"`
+	Color       string     `json:"color"`
+	Sex         string     `json:"sex"`
+	Age         uint       `json:"age"`
+	Observation string     `json:"observation"`
+	DeathDate   *time.Time `json:"death_date"`
 
 	PickupRequired bool   `json:"pickup_required"`
 	PickupAddress  string `json:"pickup_address"`
@@ -59,4 +64,17 @@ type OrderResponse struct {
 	Active bool    `json:"active"`
 	Price  float64 `json:"price"`
 	Status string  `json:"status"`
+}
+
+type OrderViewProfile struct {
+	Folio          string     `json:"folio"`
+	PetName        string     `json:"pet_name"`
+	Species        string     `json:"species"`
+	DeathDate      *time.Time `json:"death_date"`
+	Status         string     `json:"status"`
+	ServiceName    string     `json:"service_name"`
+	Price          float64    `json:"price"`
+	PickupRequired bool       `json:"pickup_required"`
+
+	CreationDate string `json:"creation_date"`
 }

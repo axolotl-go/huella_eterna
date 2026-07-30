@@ -44,6 +44,47 @@ func Create(c *fiber.Ctx) error {
 	})
 }
 
+func Edit(c *fiber.Ctx) error {
+	var (
+		service ServiceType
+		update  UpdateService
+	)
+
+	ID := c.Params("id")
+
+	if err := c.BodyParser(&update); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid body",
+		})
+	}
+
+	if err := db.DB.First(&service, ID).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Service Not Found.",
+		})
+	}
+
+	if update.Name != "" {
+		service.Name = update.Name
+	}
+
+	if update.Description != "" {
+		service.Description = update.Description
+	}
+
+	if update.Price != 0 {
+		service.Price = update.Price
+	}
+
+	if err := db.DB.Save(&service).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Could not update service",
+		})
+	}
+
+	return c.JSON(service)
+}
+
 func View(c *fiber.Ctx) error {
 	var serviceType ServiceType
 	id := c.Params("id")

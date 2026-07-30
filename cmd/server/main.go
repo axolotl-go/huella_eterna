@@ -33,10 +33,13 @@ func main() {
 	// 	log.Fatal(err)
 	// }
 
+	// Delete all info
 	// db.DB.Migrator().DropTable(
+	// 	&users.User{},
 	// 	&pets.Pet{},
 	// 	&serviceorders.Order{},
-
+	// 	&servicetype.ServiceType{},
+	// 	&formregister.Appointment{},
 	// )
 
 	db.DB.AutoMigrate(

@@ -2,9 +2,9 @@ package serviceorders
 
 import (
 	"errors"
+	"strconv"
 
 	servicetype "github.com/axolotl-go/eternal_paw/internal/ServiceType"
-	"github.com/axolotl-go/eternal_paw/internal/auth"
 	"github.com/axolotl-go/eternal_paw/internal/db"
 	"github.com/axolotl-go/eternal_paw/internal/pets"
 	"github.com/axolotl-go/eternal_paw/internal/users"
@@ -13,23 +13,17 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-var validate = validator.New()
-
 const taxRate = 0.17
 
+var validate = validator.New()
+
 func Create(c *fiber.Ctx) error {
-	var order Order
-	var user users.User
-	var serviceType servicetype.ServiceType
 
-	token := c.Cookies("token")
-
-	claims, err := auth.ParserJwt(token)
-	if err != nil {
-		return c.JSON(fiber.Map{
-			"error": "Invalid token",
-		})
-	}
+	var (
+		user        = c.Locals("user").(*users.User)
+		order       Order
+		serviceType servicetype.ServiceType
+	)
 
 	if err := c.BodyParser(&order); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -43,17 +37,11 @@ func Create(c *fiber.Ctx) error {
 		})
 	}
 
-	if err := db.DB.Where("id = ?", claims["id"]).First(&user).Error; err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"error": "User not found",
-		})
-	}
-
 	order.UserID = user.ID
 	order.Pet.UserID = user.ID
 	order.Pet.ID = order.Pet.ID
 
-	if err := db.DB.Where("id = ?", order.ServiceTypeID).First(&serviceType).Error; err != nil {
+	if err := db.DB.First(&serviceType, order.ServiceTypeID).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "Service not found",
 		})
@@ -129,6 +117,7 @@ func Views(c *fiber.Ctx) error {
 			PetName:     order.Pet.Name,
 			ServiceName: service.Name,
 			Status:      order.Status,
+			Price:       float32(order.Price),
 			Date:        &order.UpdatedAt,
 		})
 	}
@@ -177,12 +166,17 @@ func View(c *fiber.Ctx) error {
 		UserName: user.Name,
 		Email:    user.Email,
 		Phone:    user.Phone,
+		Address:  user.Address,
 
-		PetName:   pet.Name,
-		Species:   pet.Species,
-		Breed:     pet.Breed,
-		Weight:    pet.Weight,
-		DeathDate: pet.DeathDate,
+		PetName:     pet.Name,
+		Species:     pet.Species,
+		Breed:       pet.Breed,
+		Weight:      pet.Weight,
+		Color:       pet.Color,
+		Sex:         pet.Sex,
+		Observation: pet.Observation,
+		Age:         pet.Age,
+		DeathDate:   pet.DeathDate,
 
 		PickupRequired: order.PickupRequired,
 		PickupAddress:  order.PickupAddress,
@@ -199,4 +193,83 @@ func View(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"data": response,
 	})
+}
+
+func ViewMyOrders(c *fiber.Ctx) error {
+	var (
+		authUser      = *c.Locals("user").(*users.User)
+		targetUser    users.User
+		orders        []Order
+		orderResponse []OrderViewProfile
+	)
+
+	var targetUserID uint
+
+	if authUser.Role == "admin" {
+		id, err := strconv.ParseUint(c.Params("id"), 10, 64)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Invalid user id",
+			})
+		}
+
+		targetUserID = uint(id)
+	} else {
+		targetUserID = authUser.ID
+	}
+
+	if err := db.DB.First(&targetUser, targetUserID).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "User not found",
+		})
+	}
+
+	if err := db.DB.
+		Preload("Pet").
+		Where("user_id = ?", targetUserID).
+		Find(&orders).Error; err != nil {
+
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	for _, order := range orders {
+		var serviceType servicetype.ServiceType
+
+		if err := db.DB.First(&serviceType, order.ServiceTypeID).Error; err != nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "Service type not found",
+			})
+		}
+
+		orderResponse = append(orderResponse, OrderViewProfile{
+			Folio:          order.OrderNumber,
+			PetName:        order.Pet.Name,
+			Species:        order.Pet.Species,
+			DeathDate:      order.Pet.DeathDate,
+			Status:         order.Status,
+			Price:          order.Price,
+			ServiceName:    serviceType.Name,
+			PickupRequired: order.PickupRequired,
+			CreationDate:   order.CreatedAt.Format("2006-01-02"),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"creation_date": targetUser.CreatedAt.Format("2006-01-02"),
+		"name":          targetUser.Name,
+		"email":         targetUser.Email,
+		"phone":         targetUser.Phone,
+		"address":       targetUser.Address,
+		"orders":        orderResponse,
+	})
+}
+
+func Edit(c *fiber.Ctx) error {
+	return c.JSON("")
+}
+
+func Delete(c *fiber.Ctx) error {
+	return c.JSON("")
 }

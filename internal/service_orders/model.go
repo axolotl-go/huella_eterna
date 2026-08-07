@@ -15,6 +15,7 @@ type Order struct {
 	Pet    pets.Pet `json:"pet" gorm:"constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
 
 	OrderNumber   string `json:"order_number"`
+	ServiceName   string `json:"service_name"`
 	ServiceTypeID uint   `json:"service_type_id" validate:"required"`
 
 	PickupRequired bool   `json:"pickup_required"`
@@ -22,7 +23,7 @@ type Order struct {
 
 	Active bool    `json:"active" gorm:"default:false"`
 	Price  float64 `json:"price"`
-	Status string  `json:"status"`
+	Status string  `json:"status" validate:"oneof=pending in_progress completed cancelled" `
 }
 
 type OrderPreview struct {

@@ -39,6 +39,7 @@ func SetupRouter(app *fiber.App) {
 	// User
 	private.Get("/me", users.Me)
 	private.Put("/user", users.Edit)
+	private.Post("/password", users.ChangePassword)
 	private.Delete("/user", users.Delete)
 	private.Post("/logout", users.Logout)
 
@@ -63,12 +64,14 @@ func SetupRouter(app *fiber.App) {
 	admin.Get("/users", users.Views)
 	admin.Delete("/users/:id", users.DeleteByAdmin)
 	admin.Get("/users/:id/orders", serviceorders.ViewMyOrders)
+	admin.Put("/users/edit/:id", users.EditByAdmin)
 
 	// Contact forms
 	admin.Get("/form_register", formregister.Views)
 
 	// Orders
 	admin.Get("/orders", serviceorders.Views)
+	admin.Put("/orders/:folio", serviceorders.Edit)
 
 	// Services
 	admin.Post("/service", servicetype.Create)

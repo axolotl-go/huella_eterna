@@ -9,9 +9,12 @@ import (
 	"github.com/axolotl-go/eternal_paw/internal/db"
 	"github.com/axolotl-go/eternal_paw/internal/hash"
 	"github.com/axolotl-go/eternal_paw/internal/utils"
+	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 )
+
+var validate = validator.New()
 
 func Create(c *fiber.Ctx) error {
 	var user User
@@ -83,14 +86,28 @@ func Create(c *fiber.Ctx) error {
 }
 
 func Edit(c *fiber.Ctx) error {
-	var (
-		update UpdateUser
-		user   = c.Locals("user").(*User)
-	)
+	var update UpdateUser
+
+	user, ok := c.Locals("user").(*User)
+	if !ok || user == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "unauthorized",
+		})
+	}
 
 	if err := c.BodyParser(&update); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid body",
+			"error": "invalid body",
+		})
+	}
+
+	update.Name = strings.ToLower(strings.TrimSpace(update.Name))
+	update.Phone = strings.TrimSpace(update.Phone)
+	update.Address = strings.ToLower(strings.TrimSpace(update.Address))
+
+	if err := validate.Struct(update); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
 		})
 	}
 
@@ -108,11 +125,13 @@ func Edit(c *fiber.Ctx) error {
 
 	if err := db.DB.Save(user).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
+			"error": "could not update user",
 		})
 	}
 
-	return c.JSON("Succefull")
+	return c.JSON(fiber.Map{
+		"message": "successful",
+	})
 }
 
 func Delete(c *fiber.Ctx) error {
@@ -281,4 +300,118 @@ func DeleteByAdmin(c *fiber.Ctx) error {
 	}
 
 	return c.SendStatus(fiber.StatusNoContent)
+}
+
+func EditByAdmin(c *fiber.Ctx) error {
+	targetID, err := c.ParamsInt("id")
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "ID de usuario inválido",
+		})
+	}
+
+	var user User
+	if err := db.DB.First(&user, targetID).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Usuario no encontrado",
+		})
+	}
+
+	var update User
+	if err := c.BodyParser(&update); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Cuerpo de la petición inválido",
+		})
+	}
+
+	if update.Name != "" {
+		user.Name = update.Name
+	}
+	if update.Email != "" {
+		user.Email = update.Email
+	}
+	if update.Address != "" {
+		user.Address = update.Address
+	}
+	if update.Phone != "" {
+		user.Phone = update.Phone
+	}
+	if update.Role != "" {
+		user.Role = update.Role
+	}
+
+	if update.Password != "" {
+		pass, err := hash.Hash(update.Password)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Error al procesar la contraseña",
+			})
+		}
+		user.Password = pass
+	}
+
+	if err := db.DB.Save(&user).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Error al actualizar el usuario en la base de datos",
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Usuario actualizado exitosamente",
+		"user":    user,
+	})
+}
+
+func ChangePassword(c *fiber.Ctx) error {
+	type Change struct {
+		Password        string `json:"password" validate:"required,min=8,max=72"`
+		ConfirmPassword string `json:"confirm_password" validate:"required,eqfield=Password"`
+		CurrentPassword string `json:"current_password" validate:"required,min=8,max=72"`
+	}
+
+	user, ok := c.Locals("user").(*User)
+	if !ok || user == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Usuario no autenticado",
+		})
+	}
+
+	var change Change
+
+	if err := c.BodyParser(&change); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Datos inválidos",
+		})
+	}
+
+	if err := validate.Struct(change); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	if err := hash.Verify(user.Password, change.CurrentPassword); err {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "La contraseña actual es incorrecta",
+		})
+	}
+
+	hashedPassword, err := hash.Hash(change.Password)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "No se pudo actualizar la contraseña",
+		})
+	}
+
+	user.Password = hashedPassword
+
+	if err := db.DB.Save(user).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "No se pudo actualizar la contraseña",
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Contraseña actualizada correctamente",
+	})
 }

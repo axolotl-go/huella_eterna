@@ -14,9 +14,9 @@ type User struct {
 }
 
 type UpdateUser struct {
-	Name    string `json:"name"`
-	Phone   string `json:"phone"`
-	Address string `json:"address"`
+	Name    string `json:"name" validate:"omitempty,min=2,max=100"`
+	Phone   string `json:"phone" validate:"omitempty,min=10,max=15,numeric"`
+	Address string `json:"address" validate:"omitempty,min=5,max=255"`
 }
 
 type LoginInput struct {

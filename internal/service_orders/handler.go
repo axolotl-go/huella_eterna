@@ -31,6 +31,8 @@ func Create(c *fiber.Ctx) error {
 		})
 	}
 
+	order.Status = "pending"
+
 	if err := validate.Struct(order); err != nil {
 		return c.Status(400).JSON(fiber.Map{
 			"error": err.Error(),
@@ -39,7 +41,6 @@ func Create(c *fiber.Ctx) error {
 
 	order.UserID = user.ID
 	order.Pet.UserID = user.ID
-	order.Pet.ID = order.Pet.ID
 
 	if err := db.DB.First(&serviceType, order.ServiceTypeID).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
@@ -47,6 +48,7 @@ func Create(c *fiber.Ctx) error {
 		})
 	}
 
+	order.ServiceName = serviceType.Name
 	order.Active = false
 	order.OrderNumber = utils.GenerateOrder()
 
@@ -64,7 +66,6 @@ func Create(c *fiber.Ctx) error {
 	order.Price = subtotal + tax
 
 	// Address
-	order.Status = "pending"
 
 	order.PickupAddress = ""
 	if order.PickupRequired {
@@ -98,16 +99,9 @@ func Views(c *fiber.Ctx) error {
 
 	for _, order := range orders {
 		var user users.User
-		var service servicetype.ServiceType
 
 		if err := db.DB.First(&user, order.UserID).Error; err != nil {
 			continue
-		}
-
-		if err := db.DB.First(&service, order.ServiceTypeID).Error; err != nil {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": err.Error(),
-			})
 		}
 
 		response = append(response, OrderPreview{
@@ -115,7 +109,7 @@ func Views(c *fiber.Ctx) error {
 
 			Folio:       order.OrderNumber,
 			PetName:     order.Pet.Name,
-			ServiceName: service.Name,
+			ServiceName: order.ServiceName,
 			Status:      order.Status,
 			Price:       float32(order.Price),
 			Date:        &order.UpdatedAt,
@@ -132,7 +126,6 @@ func View(c *fiber.Ctx) error {
 		order    Order
 		user     users.User
 		pet      pets.Pet
-		service  servicetype.ServiceType
 		response OrderResponse
 	)
 
@@ -156,12 +149,6 @@ func View(c *fiber.Ctx) error {
 		})
 	}
 
-	if err := db.DB.First(&service, order.ServiceTypeID).Error; err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"error": "Service Not Found",
-		})
-	}
-
 	response = OrderResponse{
 		UserName: user.Name,
 		Email:    user.Email,
@@ -181,8 +168,8 @@ func View(c *fiber.Ctx) error {
 		PickupRequired: order.PickupRequired,
 		PickupAddress:  order.PickupAddress,
 
-		ServiceID:   service.ID,
-		ServiceName: service.Name,
+		ServiceID:   order.ServiceTypeID,
+		ServiceName: order.ServiceName,
 
 		Folio:  order.OrderNumber,
 		Active: order.Active,
@@ -235,14 +222,6 @@ func ViewMyOrders(c *fiber.Ctx) error {
 	}
 
 	for _, order := range orders {
-		var serviceType servicetype.ServiceType
-
-		if err := db.DB.First(&serviceType, order.ServiceTypeID).Error; err != nil {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "Service type not found",
-			})
-		}
-
 		orderResponse = append(orderResponse, OrderViewProfile{
 			Folio:          order.OrderNumber,
 			PetName:        order.Pet.Name,
@@ -250,7 +229,7 @@ func ViewMyOrders(c *fiber.Ctx) error {
 			DeathDate:      order.Pet.DeathDate,
 			Status:         order.Status,
 			Price:          order.Price,
-			ServiceName:    serviceType.Name,
+			ServiceName:    order.ServiceName,
 			PickupRequired: order.PickupRequired,
 			CreationDate:   order.CreatedAt.Format("2006-01-02"),
 		})
@@ -263,11 +242,46 @@ func ViewMyOrders(c *fiber.Ctx) error {
 		"phone":         targetUser.Phone,
 		"address":       targetUser.Address,
 		"orders":        orderResponse,
+		"role":          targetUser.Role,
 	})
 }
 
 func Edit(c *fiber.Ctx) error {
-	return c.JSON("")
+
+	type StatusEdit struct {
+		Status string `json:"status"`
+	}
+
+	var (
+		order Order
+		body  StatusEdit
+	)
+
+	folio := c.Params("folio")
+
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Body inválido",
+		})
+	}
+
+	if err := db.DB.Where("order_number = ?", folio).First(&order).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Orden no encontrada",
+		})
+	}
+
+	order.Status = body.Status
+
+	if err := db.DB.Save(&order).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "No se pudo actualizar la orden",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Estado actualizado",
+	})
 }
 
 func Delete(c *fiber.Ctx) error {
